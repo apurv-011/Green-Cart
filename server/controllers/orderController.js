@@ -33,24 +33,30 @@ export const placeOrderCOD = async (req, res) => {
 export const placeOrderStripe = async (req, res) => {
   try {
     const { userId, items, address } = req.body;
-    const { origin } = req.headers;
+    const origin = req.headers.origin || process.env.FRONTEND_URL;
 
-    if (!address || items.length === 0) {
+    if (!address || !items || items.length === 0) {
       return res.json({ success: false, message: "Invalid data" });
     }
 
+    let amount = 0;
     let productData = [];
-    // Calculate amount using items
-    let amount = await items.reduce(async (acc, item) => {
+
+    for (const item of items) {
       const product = await Product.findById(item.product);
+
+      if (!product) {
+        throw new Error("Product not found");
+      }
+
       productData.push({
         name: product.name,
         price: product.offerPrice,
         quantity: item.quantity,
       });
-      return (await acc) + product.offerPrice * item.quantity;
-    }, 0);
-    // Add tax charge 2%
+
+      amount += product.offerPrice * item.quantity;
+    }
 
     amount += Math.floor(amount * 0.02);
 
@@ -62,24 +68,21 @@ export const placeOrderStripe = async (req, res) => {
       paymentType: "Online",
     });
 
-    // Stripe gateway initialize
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("Stripe key missing");
+    }
+
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
-    // create line items for stripe
-    const line_items = productData.map((item) => {
-      return {
-        price_data: {
-          currency: "aud",
-          product_data: {
-            name: item.name,
-          },
-          unit_amount: Math.floor(item.price + item.price * 0.02) * 100,
-        },
-        quantity: item.quantity,
-      };
-    });
+    const line_items = productData.map((item) => ({
+      price_data: {
+        currency: "aud",
+        product_data: { name: item.name },
+        unit_amount: Math.floor(item.price * 1.02) * 100,
+      },
+      quantity: item.quantity,
+    }));
 
-    // Create session
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
       mode: "payment",
@@ -92,8 +95,13 @@ export const placeOrderStripe = async (req, res) => {
     });
 
     return res.json({ success: true, url: session.url });
+
   } catch (error) {
-    return res.json({ success: false, message: error.message });
+    console.error("Stripe Order Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
