@@ -21,7 +21,7 @@ import Loading from './components/Loading'
 
 const App = () => {
 
-  const isSellerPath = useLocation().pathname.includes("seller")
+  const isSellerPath = useLocation().pathname.startsWith("/seller")
   const { showUserLogin, isSeller } = useAppContext();
 
   return (

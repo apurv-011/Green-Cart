@@ -17,7 +17,7 @@ const InputField = ({ type, placeholder, name, handleChange, address }) => (
 
 const AddAddress = () => {
 
-    const { axios, user, navigate } = useAppContext()
+    const { axios, user, authLoading, navigate } = useAppContext()
 
     const [address, setAddress] = useState({
         firstName: '',
@@ -56,10 +56,10 @@ const AddAddress = () => {
     }
 
     useEffect(() => {
-        if(!user) {
+        if(!authLoading && !user) {
             navigate("/cart")
         }
-    }, [navigate, user])
+    }, [authLoading, navigate, user])
     
 
     return (

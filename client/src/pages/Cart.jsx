@@ -49,10 +49,15 @@ const Cart = () => {
                 return toast.error("Please login to place order")
             }
 
+            const orderItems = cartArray.map(item => ({ product: item._id, quantity: item.quantity }))
+            if (orderItems.length === 0) {
+                return toast.error("Your cart is empty")
+            }
+
             // Place Order with COD
             if (paymentOption === "COD") {
                 const { data } = await axios.post('/api/order/cod', {
-                    userId: user._id, items: cartArray.map(item => ({ product: item._id, quantity: item.quantity, })), address: selectedAddress._id
+                    items: orderItems, address: selectedAddress._id
                 })
                 if (data.success) {
                     toast.success(data.message)
@@ -64,7 +69,7 @@ const Cart = () => {
             } else {
                 // Place order with stripe
                 const { data } = await axios.post('/api/order/stripe', {
-                    userId: user._id, items: cartArray.map(item => ({ product: item._id, quantity: item.quantity, })), address: selectedAddress._id
+                    items: orderItems, address: selectedAddress._id
                 })
                 if (data.success) {
                     window.location.replace(data.url)

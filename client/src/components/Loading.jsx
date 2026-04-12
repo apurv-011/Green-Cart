@@ -8,15 +8,16 @@ const Loading = () => {
     let { search } = useLocation()
     const query = new URLSearchParams(search)
     const nextURL = query.get('next')
-    useEffect(() => {
-        if(nextURL) {
-            const timer = setTimeout(()=>{
-                navigate(`/${nextURL}`)
-            },5000)
+    const allowedNextURLs = new Set(["my-orders", "cart", "products"])
+    const safeNextURL = allowedNextURLs.has(nextURL) ? nextURL : "my-orders"
 
-            return () => clearTimeout(timer)
-        }
-    }, [navigate, nextURL])
+    useEffect(() => {
+        const timer = setTimeout(()=>{
+            navigate(`/${safeNextURL}`)
+        },5000)
+
+        return () => clearTimeout(timer)
+    }, [navigate, safeNextURL])
     
 
     return (

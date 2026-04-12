@@ -10,7 +10,17 @@ import authSeller from "../middlewares/authSeller.js";
 
 const productRouter = express.Router();
 
-productRouter.post("/add", upload.array(['images']), authSeller, addProducts);
+const uploadProductImages = (req, res, next) => {
+  upload.array(["images"])(req, res, (error) => {
+    if (error) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    next();
+  });
+};
+
+productRouter.post("/add", authSeller, uploadProductImages, addProducts);
 productRouter.get("/list", productList);
 productRouter.post("/id", productById);
 productRouter.post("/stock", authSeller, changeStock);

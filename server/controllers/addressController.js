@@ -2,19 +2,53 @@
 
 import Address from "../models/Address.js";
 
-export const addAddress = async (req, res) => {
-  try {
-    const userId = req.userId; // ✅ FIXED
-    const { address } = req.body;
+const requiredAddressFields = [
+  "firstName",
+  "lastName",
+  "email",
+  "street",
+  "city",
+  "state",
+  "zipcode",
+  "country",
+  "phone",
+];
 
-    if (!address) {
-      return res.status(400).json({
-        success: false,
-        message: "Address is required",
-      });
+const sanitizeAddress = (address) => {
+  if (!address || typeof address !== "object" || Array.isArray(address)) {
+    throw new Error("Address is required");
+  }
+
+  const sanitizedAddress = {};
+
+  for (const field of requiredAddressFields) {
+    const value = String(address[field] || "").trim();
+
+    if (!value) {
+      throw new Error(`${field} is required`);
     }
 
-    await Address.create({ ...address, userId });
+    sanitizedAddress[field] = value;
+  }
+
+  const zipcode = Number(sanitizedAddress.zipcode);
+  if (!Number.isInteger(zipcode) || zipcode <= 0) {
+    throw new Error("Valid zipcode is required");
+  }
+
+  sanitizedAddress.zipcode = zipcode;
+  sanitizedAddress.email = sanitizedAddress.email.toLowerCase();
+
+  return sanitizedAddress;
+};
+
+export const addAddress = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { address } = req.body;
+    const sanitizedAddress = sanitizeAddress(address);
+
+    await Address.create({ ...sanitizedAddress, userId });
 
     return res.status(200).json({
       success: true,
@@ -24,9 +58,9 @@ export const addAddress = async (req, res) => {
   } catch (error) {
     console.log("Add address error:", error.message);
 
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      message: "Server error",
+      message: error.message,
     });
   }
 };
@@ -34,7 +68,7 @@ export const addAddress = async (req, res) => {
 // Get addresses : /api/address/get
 export const getAddress = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ FIXED
+    const userId = req.userId;
 
     const addresses = await Address.find({ userId });
 

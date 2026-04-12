@@ -37,7 +37,7 @@ const Orders = () => {
                         <div className="flex gap-5 max-w-60">
                             <img className="w-12 h-12 object-cover" src={assets.box_icon} alt="boxIcon" />
                             <div>
-                                {order.items.map((item, index) => (
+                                {order.items.filter((item) => item.product).map((item, index) => (
                                     <div key={index} className="flex flex-col">
                                         <p className="font-medium">
                                             {item.product.name}{" "}
@@ -48,21 +48,26 @@ const Orders = () => {
                             </div>
                         </div>
 
-                        <div className="text-sm md:text-base text-black/60">
-                            <p className='text-black/80'>
-                                {order.address.firstName}
-                                {order.address.lastName}
-                            </p>
-                            <p>{order.address.street},
-                                {order.address.city}
-                            </p>
-                            <p> {order.address.state}, 
-                                {order.address.zipcode}, 
-                                {order.address.country}
-                            </p>
-                            <p></p>
-                            <p>{order.address.phone}</p>
-                        </div>
+                        {order.address ? (
+                            <div className="text-sm md:text-base text-black/60">
+                                <p className='text-black/80'>
+                                    {order.address.firstName} {order.address.lastName}
+                                </p>
+                                <p>{order.address.street},
+                                    {order.address.city}
+                                </p>
+                                <p> {order.address.state}, 
+                                    {order.address.zipcode}, 
+                                    {order.address.country}
+                                </p>
+                                <p></p>
+                                <p>{order.address.phone}</p>
+                            </div>
+                        ) : (
+                            <div className="text-sm md:text-base text-black/60">
+                                <p>Address unavailable</p>
+                            </div>
+                        )}
 
                         <p className="font-medium text-lg my-auto">{currency}{order.amount}</p>
 

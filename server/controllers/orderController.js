@@ -1,7 +1,101 @@
 import Order from "../models/Order.js";
 import Product from "../models/Products.js";
 import User from "../models/User.js";
+import Address from "../models/Address.js";
 import stripe from "stripe";
+import mongoose from "mongoose";
+
+const TAX_RATE = 0.02;
+
+const createClientError = (message) => {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+};
+
+const formatAmount = (amount) => Math.round(amount * 100) / 100;
+
+const toStripeCents = (amount) => Math.round(formatAmount(amount) * 100);
+
+const getStripeCurrency = () => (process.env.STRIPE_CURRENCY || "aud").toLowerCase();
+
+const normalizeOrderItems = (items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw createClientError("Cart is empty");
+  }
+
+  return items.map((item) => {
+    const product = String(item.product || "").trim();
+    const quantity = Number(item.quantity);
+
+    if (!mongoose.isValidObjectId(product)) {
+      throw createClientError("Invalid product in cart");
+    }
+
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw createClientError("Invalid product quantity");
+    }
+
+    return { product, quantity };
+  });
+};
+
+const prepareOrder = async ({ items, address, userId }) => {
+  const normalizedItems = normalizeOrderItems(items);
+
+  if (!mongoose.isValidObjectId(address)) {
+    throw createClientError("Invalid address");
+  }
+
+  const addressDoc = await Address.findOne({ _id: address, userId });
+  if (!addressDoc) {
+    throw createClientError("Address not found for this user");
+  }
+
+  const productIds = [...new Set(normalizedItems.map((item) => item.product))];
+  const products = await Product.find({ _id: { $in: productIds } });
+  const productMap = new Map(products.map((product) => [product._id.toString(), product]));
+
+  let subtotal = 0;
+  const productData = normalizedItems.map((item) => {
+    const product = productMap.get(item.product);
+
+    if (!product) {
+      throw createClientError("Product not found");
+    }
+
+    if (!product.inStock) {
+      throw createClientError(`${product.name} is out of stock`);
+    }
+
+    subtotal += product.offerPrice * item.quantity;
+
+    return {
+      name: product.name,
+      price: product.offerPrice,
+      quantity: item.quantity,
+    };
+  });
+
+  const tax = formatAmount(subtotal * TAX_RATE);
+  const amount = formatAmount(subtotal + tax);
+
+  return {
+    amount,
+    tax,
+    productData,
+    items: normalizedItems,
+    address: addressDoc._id.toString(),
+  };
+};
+
+const sendOrderError = (res, error) => {
+  const status = error.statusCode || 500;
+  return res.status(status).json({
+    success: false,
+    message: status === 500 ? "Server error" : error.message,
+  });
+};
 
 // Place Order using COD: /api/order/cod
 export const placeOrderCOD = async (req, res) => {
@@ -9,75 +103,36 @@ export const placeOrderCOD = async (req, res) => {
     const { items, address } = req.body;
     const userId = req.userId;
 
-    if (!address || !items || items.length === 0) {
-      return res.json({ success: false, message: "Invalid data" });
-    }
+    const order = await prepareOrder({ items, address, userId });
 
-    // Calculate amount using items
-    let amount = await items.reduce(async (acc, item) => {
-      const product = await Product.findById(item.product);
-
-      if (!product) {
-        throw new Error("Product not found");
-      }
-
-      return (await acc) + product.offerPrice * item.quantity;
-    }, 0);
-    // Add tax charge 2%
-
-    amount += Math.floor(amount * 0.02);
-
-    await Order.create({ userId, items, amount, address, paymentType: "COD" });
+    await Order.create({
+      userId,
+      items: order.items,
+      amount: order.amount,
+      address: order.address,
+      paymentType: "COD",
+    });
 
     return res.json({ success: true, message: "Order placed successfully" });
   } catch (error) {
-    return res.json({ success: false, message: error.message });
+    return sendOrderError(res, error);
   }
 };
 
 // Place Order using Stripe: /api/order/stripe
 export const placeOrderStripe = async (req, res) => {
+  let order;
+
   try {
     const { items, address } = req.body;
     const userId = req.userId;
     const origin = req.headers.origin || process.env.FRONTEND_URL;
 
-    if (!address || !items || items.length === 0) {
-      return res.json({ success: false, message: "Invalid data" });
-    }
-
     if (!origin) {
-      return res.json({ success: false, message: "Frontend URL missing" });
+      throw createClientError("Frontend URL missing");
     }
 
-    let amount = 0;
-    let productData = [];
-
-    for (const item of items) {
-      const product = await Product.findById(item.product);
-
-      if (!product) {
-        throw new Error("Product not found");
-      }
-
-      productData.push({
-        name: product.name,
-        price: product.offerPrice,
-        quantity: item.quantity,
-      });
-
-      amount += product.offerPrice * item.quantity;
-    }
-
-    amount += Math.floor(amount * 0.02);
-
-    const order = await Order.create({
-      userId,
-      items,
-      amount,
-      address,
-      paymentType: "Online",
-    });
+    const orderData = await prepareOrder({ items, address, userId });
 
     if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error("Stripe key missing");
@@ -85,14 +140,33 @@ export const placeOrderStripe = async (req, res) => {
 
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
-    const line_items = productData.map((item) => ({
+    order = await Order.create({
+      userId,
+      items: orderData.items,
+      amount: orderData.amount,
+      address: orderData.address,
+      paymentType: "Online",
+    });
+
+    const line_items = orderData.productData.map((item) => ({
       price_data: {
-        currency: "aud",
+        currency: getStripeCurrency(),
         product_data: { name: item.name },
-        unit_amount: Math.floor(item.price * 1.02 * 100),
+        unit_amount: toStripeCents(item.price),
       },
       quantity: item.quantity,
     }));
+
+    if (orderData.tax > 0) {
+      line_items.push({
+        price_data: {
+          currency: getStripeCurrency(),
+          product_data: { name: "Tax" },
+          unit_amount: toStripeCents(orderData.tax),
+        },
+        quantity: 1,
+      });
+    }
 
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
@@ -115,10 +189,12 @@ export const placeOrderStripe = async (req, res) => {
 
   } catch (error) {
     console.error("Stripe Order Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+
+    if (order?._id) {
+      await Order.findByIdAndDelete(order._id).catch(() => {});
+    }
+
+    return sendOrderError(res, error);
   }
 };
 
@@ -183,7 +259,7 @@ export const stripeWebhooks = async (req, res) => {
 // Get orders by User ID : /api/order/user
 export const getUserOrders = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ FIXED
+    const userId = req.userId;
 
     const orders = await Order.find({
       userId,

@@ -24,7 +24,7 @@ const allowedOrigins = [
   "http://127.0.0.1:5173",
   process.env.FRONTEND_URL,
   ...(process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(",") : []),
-].filter(Boolean).map((origin) => origin.trim());
+].filter(Boolean).map((origin) => origin.trim().replace(/\/$/, ""));
 
 app.post('/stripe', express.raw({type: "application/json"}), stripeWebhooks)
 
@@ -33,7 +33,9 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    const normalizedOrigin = origin?.replace(/\/$/, "");
+
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
 

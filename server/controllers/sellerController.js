@@ -1,31 +1,33 @@
 import jwt from "jsonwebtoken";
+import { getAuthCookieOptions } from "../utils/cookieOptions.js";
 
 // Login seller : /api/seller/login
 export const sellerLogin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = String(rawEmail || "").trim().toLowerCase();
+
+    if (!process.env.SELLER_EMAIL || !process.env.SELLER_PASSWORD) {
+      return res.status(500).json({ success: false, message: "Seller credentials are not configured" });
+    }
+
     if (
       password === process.env.SELLER_PASSWORD &&
-      email === process.env.SELLER_EMAIL
+      email === process.env.SELLER_EMAIL.toLowerCase()
     ) {
       const token = jwt.sign({ email }, process.env.JWT_SECRET, {
         expiresIn: "7d",
       });
 
-      res.cookie("sellerToken", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie("sellerToken", token, getAuthCookieOptions());
 
       return res.json({ success: true, message: "Logged In" });
     } else {
-      return res.json({ success: false, message: "Invalid Credentials" });
+      return res.status(401).json({ success: false, message: "Invalid Credentials" });
     }
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -35,7 +37,7 @@ export const isSellerAuth = async (req, res) => {
     return res.json({ success: true });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -43,16 +45,12 @@ export const isSellerAuth = async (req, res) => {
 
 export const sellerLogout = async (req, res) => {
   try {
-    res.clearCookie("sellerToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    });
+    res.clearCookie("sellerToken", getAuthCookieOptions({ maxAge: null }));
 
     return res.json({ success: true, message: "Logged Out" });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 

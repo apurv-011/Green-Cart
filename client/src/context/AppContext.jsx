@@ -4,17 +4,43 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import axios from 'axios'
 
+const getBackendURL = () => {
+    const configuredURL = import.meta.env.VITE_BACKEND_URL?.trim().replace(/^["']|["']$/g, "")
+
+    if (!configuredURL) {
+        return `${window.location.protocol}//${window.location.hostname}:3000`
+    }
+
+    const normalizedURL = configuredURL.replace(/\/$/, "")
+
+    try {
+        const url = new URL(configuredURL)
+        const localHosts = ["localhost", "127.0.0.1"]
+        const frontendHost = window.location.hostname
+
+        if (localHosts.includes(url.hostname) && localHosts.includes(frontendHost) && url.hostname !== frontendHost) {
+            url.hostname = frontendHost
+            return url.toString().replace(/\/$/, "")
+        }
+    } catch {
+        return normalizedURL
+    }
+
+    return normalizedURL
+}
+
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+axios.defaults.baseURL = getBackendURL();
 
 export const AppContext = createContext()
 
 export const AppContextProvider = ({ children }) => {
 
-    const currency = import.meta.env.VITE_CURRENCY;
+    const currency = import.meta.env.VITE_CURRENCY || "$";
 
     const navigate = useNavigate()
     const [user, setUser] = useState(null)
+    const [authLoading, setAuthLoading] = useState(true)
     const [isSeller, setIsSeller] = useState(false)
     const [showUserLogin, setShowUserLogin] = useState(false)
     const [products, setProducts] = useState([])
@@ -32,8 +58,8 @@ export const AppContextProvider = ({ children }) => {
                 setIsSeller(false)
             }
 
-        } catch (error) {
-            console.log(error)
+        } catch {
+            setIsSeller(false)
         }
     }
 
@@ -45,9 +71,10 @@ export const AppContextProvider = ({ children }) => {
                 setUser(data.user)
                 setCartItems(data.user.cartItems || {})
             }
-        // eslint-disable-next-line no-unused-vars
-        } catch (error) {
+        } catch {
             setUser(null)
+        } finally {
+            setAuthLoading(false)
         }
     }
 
@@ -125,7 +152,6 @@ export const AppContextProvider = ({ children }) => {
 
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchUser()
         fetchSeller()
         fetchProducts()
@@ -137,6 +163,8 @@ export const AppContextProvider = ({ children }) => {
                 const { data } = await axios.post("/api/cart/update", { cartItems })
                 if (!data.success) {
                     toast.error(data.message)
+                } else if (JSON.stringify(data.cartItems || {}) !== JSON.stringify(cartItems)) {
+                    setCartItems(data.cartItems || {})
                 }
             } catch (error) {
                 toast.error(error.message)
@@ -149,7 +177,7 @@ export const AppContextProvider = ({ children }) => {
     }, [cartItems, user])
 
 
-    const value = { navigate, user, setUser, isSeller, setIsSeller, showUserLogin, setShowUserLogin, products, setProducts, currency, addToCart, updateCartItem, removeFromCart, cartItems, searchQuery, setSearchQuery, getCartCount, getCartTotal, axios, fetchProducts, setCartItems }
+    const value = { navigate, user, setUser, authLoading, isSeller, setIsSeller, showUserLogin, setShowUserLogin, products, setProducts, currency, addToCart, updateCartItem, removeFromCart, cartItems, searchQuery, setSearchQuery, getCartCount, getCartTotal, axios, fetchProducts, setCartItems }
     return (
         <AppContext.Provider value={value}>
             {children}

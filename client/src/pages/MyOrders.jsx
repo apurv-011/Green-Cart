@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAppContext } from '../context/AppContext'
+import toast from 'react-hot-toast'
 
 const MyOrders = () => {
 
@@ -14,7 +15,7 @@ const MyOrders = () => {
                 setMyOrders(data.orders)
             }
         } catch (error) {
-            console.log(error)
+            toast.error(error.message)
         }
     }, [axios])
 
@@ -40,7 +41,7 @@ const MyOrders = () => {
                         <span>Payment : {order.paymentType}</span>
                         <span>Total Amount : {currency}{order.amount}</span>
                     </p>
-                    {order.items.map((item, index) => (
+                    {order.items.filter((item) => item.product).map((item, index) => (
                         <div key={index} className={`relative bg-white text-gray-500/70 ${order.items.length !== index + 1 && "border-b"} border-gray-300 flex flex-col md:flex-row md:items-center justify-between p-3 py-3 md:gap-8 w-full max-w-4xl`}>
                             <div className='flex items-center mb-3 rounded-lg'>
                                 <div className='bg-primary/10 p-2 rounded-lg'>

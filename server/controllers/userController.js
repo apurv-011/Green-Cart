@@ -3,16 +3,25 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { getAuthCookieOptions } from "../utils/cookieOptions.js";
 
 export const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email: rawEmail, password } = req.body;
+    const email = String(rawEmail || "").trim().toLowerCase();
+    const trimmedName = String(name || "").trim();
 
     // Validate input
-    if (!name || !email || !password) {
+    if (!trimmedName || !email || typeof password !== "string" || !password) {
       return res
         .status(400)
         .json({ message: "Missing required fields", success: false });
+    }
+
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters", success: false });
     }
 
     const existingUser = await User.findOne({ email });
@@ -25,7 +34,7 @@ export const register = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
+      name: trimmedName,
       email,
       password: hashedPassword,
     });
@@ -34,12 +43,7 @@ export const register = async (req, res) => {
       expiresIn: "7d",
     });
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     return res.json({
       success: true,
@@ -47,16 +51,17 @@ export const register = async (req, res) => {
     });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = String(rawEmail || "").trim().toLowerCase();
 
     // Validate input
-    if (!email || !password) {
+    if (!email || typeof password !== "string" || !password) {
       return res.status(400).json({
         success: false,
         message: "Email and password are required",
@@ -88,13 +93,7 @@ export const login = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // Set cookie ✅ FIXED CONFIG
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, getAuthCookieOptions());
 
     // Send response
     return res.status(200).json({
@@ -119,7 +118,7 @@ export const login = async (req, res) => {
 // Check auth : /api/user/is-auth
 export const isAuth = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ FIXED
+    const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({
@@ -156,15 +155,11 @@ export const isAuth = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
-    });
+    res.clearCookie("token", getAuthCookieOptions({ maxAge: null }));
 
     return res.json({ success: true, message: "Logged Out" });
   } catch (error) {
     console.log(error.message);
-    res.json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };

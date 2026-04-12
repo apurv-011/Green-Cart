@@ -21,16 +21,21 @@ const AddProduct = () => {
             e.preventDefault();
             const productData = {
                 name,
-                description: description.split('\n'),
+                description: description.split('\n').map((item) => item.trim()).filter(Boolean),
                 category,
                 price,
                 offerPrice
             }
+            const selectedFiles = files.filter(Boolean)
+
+            if (selectedFiles.length === 0) {
+                return toast.error("Please add at least one product image")
+            }
 
             const formData = new FormData();
             formData.append('productData', JSON.stringify(productData))
-            for (let i = 0; i < files.length; i++) {
-                formData.append('images', files[i])
+            for (const file of selectedFiles) {
+                formData.append('images', file)
             }
 
             const { data } = await axios.post('/api/product/add', formData)
@@ -86,12 +91,12 @@ const AddProduct = () => {
                 <div className="flex flex-col gap-1 max-w-md">
                     <label className="text-base font-medium" htmlFor="product-description">Product Description</label>
                     <textarea onChange={(e) => setDescription(e.target.value)} value={description}
-                        id="product-description" rows={4} className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none" placeholder="Type here"></textarea>
+                        id="product-description" rows={4} className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none" placeholder="Type here" required></textarea>
                 </div>
                 <div className="w-full flex flex-col gap-1">
                     <label className="text-base font-medium" htmlFor="category">Category</label>
                     <select onChange={(e) => setCategory(e.target.value)} value={category}
-                        id="category" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40">
+                        id="category" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40" required>
                         <option value="">Select Category</option>
                         {categories.map((item, index) => (
                             <option key={index} value={item.path}>{item.path}</option>
@@ -102,12 +107,12 @@ const AddProduct = () => {
                     <div className="flex-1 flex flex-col gap-1 w-32">
                         <label className="text-base font-medium" htmlFor="product-price">Product Price</label>
                         <input onChange={(e) => setPrice(e.target.value)} value={price}
-                            id="product-price" type="number" placeholder="0" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40" required />
+                            id="product-price" type="number" min="1" step="0.01" placeholder="0" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40" required />
                     </div>
                     <div className="flex-1 flex flex-col gap-1 w-32">
                         <label className="text-base font-medium" htmlFor="offer-price">Offer Price</label>
                         <input onChange={(e) => setOfferPrice(e.target.value)} value={offerPrice}
-                            id="offer-price" type="number" placeholder="0" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40" required />
+                            id="offer-price" type="number" min="1" step="0.01" placeholder="0" className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40" required />
                     </div>
                 </div>
                 <button className="px-8 py-2.5 bg-primary cursor-pointer text-white font-medium rounded">ADD</button>
