@@ -18,15 +18,29 @@ const port = process.env.PORT || 3000;
 await connectDB();
 await connectCloudinary();
 
-// Allow muliple origins for CORS
-const allowedOrigins = ["http://localhost:5173"];
+// Allow multiple origins for CORS
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(",") : []),
+].filter(Boolean).map((origin) => origin.trim());
 
 app.post('/stripe', express.raw({type: "application/json"}), stripeWebhooks)
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -39,6 +53,10 @@ app.use("/api/cart", cartRouter)
 app.use("/api/address", addressRouter)
 app.use("/api/order", orderRouter)
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
+}
+
+export default app;

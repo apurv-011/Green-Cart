@@ -39,7 +39,17 @@ export const productList = async (req, res) => {
 export const productById = async (req, res) => {
   try {
     const { id } = req.body;
-    const product = await Product.findById({ id });
+
+    if (!id) {
+      return res.json({ success: false, message: "Product id is required" });
+    }
+
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return res.json({ success: false, message: "Product not found" });
+    }
+
     return res.json({ success: true, product });
   } catch (error) {
     console.log(error.message);

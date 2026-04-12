@@ -1,12 +1,12 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import axios from 'axios'
 
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
+axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const AppContext = createContext()
 
 export const AppContextProvider = ({ children }) => {
@@ -19,7 +19,7 @@ export const AppContextProvider = ({ children }) => {
     const [showUserLogin, setShowUserLogin] = useState(false)
     const [products, setProducts] = useState([])
     const [cartItems, setCartItems] = useState({})
-    const [searchQuery, setSearchQuery] = useState({})
+    const [searchQuery, setSearchQuery] = useState("")
 
     // fetch Seller Status
     const fetchSeller = async () => {
@@ -43,7 +43,7 @@ export const AppContextProvider = ({ children }) => {
             const { data } = await axios.get('/api/user/is-auth')
             if (data.success) {
                 setUser(data.user)
-                setCartItems(data.user.cartItems)
+                setCartItems(data.user.cartItems || {})
             }
         // eslint-disable-next-line no-unused-vars
         } catch (error) {
@@ -116,7 +116,7 @@ export const AppContextProvider = ({ children }) => {
         let totalAmount = 0;
         for (const item in cartItems) {
             let itemInfo = products.find((product) => product._id === item)
-            if (cartItems[item] > 0) {
+            if (itemInfo && cartItems[item] > 0) {
                 totalAmount += itemInfo.offerPrice * cartItems[item]
             }
         }
@@ -146,7 +146,7 @@ export const AppContextProvider = ({ children }) => {
         if (user) {
             updateCart()
         }
-    }, [cartItems])
+    }, [cartItems, user])
 
 
     const value = { navigate, user, setUser, isSeller, setIsSeller, showUserLogin, setShowUserLogin, products, setProducts, currency, addToCart, updateCartItem, removeFromCart, cartItems, searchQuery, setSearchQuery, getCartCount, getCartTotal, axios, fetchProducts, setCartItems }

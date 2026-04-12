@@ -59,7 +59,7 @@ const AddAddress = () => {
         if(!user) {
             navigate("/cart")
         }
-    }, [])
+    }, [navigate, user])
     
 
     return (

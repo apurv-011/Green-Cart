@@ -16,8 +16,9 @@ const Cart = () => {
         let tempArray = [];
         for (const key in cartItems) {
             const product = products.find((item) => item._id === key)
-            product.quantity = cartItems[key]
-            tempArray.push(product)
+            if (product) {
+                tempArray.push({ ...product, quantity: cartItems[key] })
+            }
         }
         setCartArray(tempArray);
     }
@@ -42,6 +43,10 @@ const Cart = () => {
         try {
             if (!selectedAddress) {
                 return toast.error("Please select an address")
+            }
+
+            if (!user) {
+                return toast.error("Please login to place order")
             }
 
             // Place Order with COD
@@ -154,7 +159,7 @@ const Cart = () => {
                         {showAddress && (
                             <div className="absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full">
                                 {addresses.map((address) => (
-                                    <p onClick={() => { setSelectedAddress(address); setShowAddress(false) }} className="text-gray-500 p-2 hover:bg-gray-100">
+                                    <p key={address._id} onClick={() => { setSelectedAddress(address); setShowAddress(false) }} className="text-gray-500 p-2 hover:bg-gray-100">
                                         {address.street}, {address.city}, {address.state}, {address.country}
                                     </p>
                                 ))}
@@ -186,7 +191,7 @@ const Cart = () => {
                         <span>Tax (2%)</span><span>{currency}{getCartTotal() * 2 / 100}</span>
                     </p>
                     <p className="flex justify-between text-lg font-medium mt-3">
-                        <span>Total Amount:</span><span>{"///"}{getCartTotal() + (getCartTotal() * 2 / 100)}</span>
+                        <span>Total Amount:</span><span>{currency}{getCartTotal() + (getCartTotal() * 2 / 100)}</span>
                     </p>
                 </div>
 

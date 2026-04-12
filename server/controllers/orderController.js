@@ -6,15 +6,21 @@ import stripe from "stripe";
 // Place Order using COD: /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
-    const { userId, items, address } = req.body;
+    const { items, address } = req.body;
+    const userId = req.userId;
 
-    if (!address || items.length === 0) {
+    if (!address || !items || items.length === 0) {
       return res.json({ success: false, message: "Invalid data" });
     }
 
     // Calculate amount using items
     let amount = await items.reduce(async (acc, item) => {
       const product = await Product.findById(item.product);
+
+      if (!product) {
+        throw new Error("Product not found");
+      }
+
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
     // Add tax charge 2%
@@ -32,11 +38,16 @@ export const placeOrderCOD = async (req, res) => {
 // Place Order using Stripe: /api/order/stripe
 export const placeOrderStripe = async (req, res) => {
   try {
-    const { userId, items, address } = req.body;
+    const { items, address } = req.body;
+    const userId = req.userId;
     const origin = req.headers.origin || process.env.FRONTEND_URL;
 
     if (!address || !items || items.length === 0) {
       return res.json({ success: false, message: "Invalid data" });
+    }
+
+    if (!origin) {
+      return res.json({ success: false, message: "Frontend URL missing" });
     }
 
     let amount = 0;
@@ -78,7 +89,7 @@ export const placeOrderStripe = async (req, res) => {
       price_data: {
         currency: "aud",
         product_data: { name: item.name },
-        unit_amount: Math.floor(item.price * 1.02) * 100,
+        unit_amount: Math.floor(item.price * 1.02 * 100),
       },
       quantity: item.quantity,
     }));

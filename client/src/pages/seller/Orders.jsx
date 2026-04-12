@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useAppContext } from '../../context/AppContext';
 import { assets } from '../../assets/assets';
 import toast from 'react-hot-toast';
@@ -9,7 +9,7 @@ const Orders = () => {
 
     const [orders, setOrders] = useState([])
 
-    const fetchOrders = async () => {
+    const fetchOrders = useCallback(async () => {
         try {
             const { data } = await axios.get('/api/order/seller')
             if(data.success) {
@@ -20,12 +20,12 @@ const Orders = () => {
         } catch (error) {
             toast.error(error.message)
         }
-    }
+    }, [axios])
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         fetchOrders()
-    }, [])
+    }, [fetchOrders])
 
 
     return (

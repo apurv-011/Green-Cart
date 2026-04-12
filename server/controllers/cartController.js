@@ -12,6 +12,10 @@ export const updateCart = async (req, res) => {
       { new: true }
     );
 
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
     return res.json({
       success: true,
       cartItems: user.cartItems,

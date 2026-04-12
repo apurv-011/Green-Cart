@@ -28,7 +28,7 @@ const SellerLogin = () => {
         if (isSeller) {
             navigate("/seller")
         }
-    }, [isSeller])
+    }, [isSeller, navigate])
 
 
     return !isSeller && (

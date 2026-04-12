@@ -43,7 +43,7 @@ const Navbar = () => {
             <div className="hidden sm:flex items-center gap-8">
                 <NavLink to='/' >Home</NavLink>
                 <NavLink to='/products' >All Product</NavLink>
-                <NavLink to='/contact' >Contact</NavLink>
+                <a href="#contact">Contact</a>
 
                 <div className="hidden lg:flex items-center text-sm gap-2 border border-gray-300 px-3 rounded-full">
                     <input onChange={(e) => {
@@ -64,7 +64,7 @@ const Navbar = () => {
                         <img src={assets.profile_icon} className='w-10' alt="" />
                         <ul className='hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-30 rounded-md text-sm z-40'>
                             <li
-                                onClick={() => navigate('my-orders')}
+                                onClick={() => navigate('/my-orders')}
                                 className='p-1.5 pl-3 hover:bg-primary/10 cursor-pointer'>My Orders</li>
                             <li
                                 onClick={logout}
@@ -93,10 +93,10 @@ const Navbar = () => {
                     <NavLink to='/' onClick={() => setOpen(false)}>Home</NavLink>
                     <NavLink to='/products' onClick={() => setOpen(false)}>All Product</NavLink>
                     {user &&
-                        <NavLink to='/contact' onClick={() => setOpen(false)}>My Orders</NavLink>
+                        <NavLink to='/my-orders' onClick={() => setOpen(false)}>My Orders</NavLink>
                     }
 
-                    <NavLink to='/' onClick={() => setOpen(false)}>Contact</NavLink>
+                    <a href="#contact" onClick={() => setOpen(false)}>Contact</a>
 
 
                     {!user ? (<button onClick={() => {

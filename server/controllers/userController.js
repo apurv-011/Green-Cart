@@ -43,7 +43,7 @@ export const register = async (req, res) => {
 
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name },
+      user: { _id: user._id, email: user.email, name: user.name },
     });
   } catch (error) {
     console.log(error.message);
@@ -92,7 +92,7 @@ export const login = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-      sameSite: "lax", // ✅ IMPORTANT (fixes logout issue)
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

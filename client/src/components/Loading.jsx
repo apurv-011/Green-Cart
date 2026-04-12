@@ -10,11 +10,13 @@ const Loading = () => {
     const nextURL = query.get('next')
     useEffect(() => {
         if(nextURL) {
-            setTimeout(()=>{
+            const timer = setTimeout(()=>{
                 navigate(`/${nextURL}`)
             },5000)
+
+            return () => clearTimeout(timer)
         }
-    }, [nextURL])
+    }, [navigate, nextURL])
     
 
     return (
