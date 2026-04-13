@@ -97,6 +97,9 @@ const sendOrderError = (res, error) => {
   });
 };
 
+const buildStripeSuccessUrl = (origin) =>
+  `${origin}/loader?next=my-orders&session_id={CHECKOUT_SESSION_ID}`;
+
 // Place Order using COD: /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -171,7 +174,7 @@ export const placeOrderStripe = async (req, res) => {
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
       mode: "payment",
-      success_url: `${origin}/loader?next=my-orders`,
+      success_url: buildStripeSuccessUrl(origin),
       cancel_url: `${origin}/cart`,
       payment_intent_data: {
         metadata: {
@@ -185,6 +188,7 @@ export const placeOrderStripe = async (req, res) => {
       },
     });
 
+    await Order.findByIdAndUpdate(order._id, { stripeSessionId: session.id }).catch(() => {});
     return res.json({ success: true, url: session.url });
 
   } catch (error) {
@@ -219,6 +223,42 @@ export const stripeWebhooks = async (req, res) => {
     console.log("Stripe event:", event.type);
 
     switch (event.type) {
+      case "checkout.session.completed":
+      case "checkout.session.async_payment_succeeded": {
+        const session = event.data.object;
+        const { orderId, userId } = session.metadata || {};
+
+        if (!orderId || !userId) {
+          console.error("Missing session metadata");
+          break;
+        }
+
+        if (session.payment_status !== "paid") {
+          break;
+        }
+
+        await Order.findByIdAndUpdate(orderId, {
+          isPaid: true,
+          stripeSessionId: session.id,
+          stripePaymentIntentId: session.payment_intent || null,
+        });
+        await User.findByIdAndUpdate(userId, { cartItems: {} });
+
+        break;
+      }
+
+      case "checkout.session.async_payment_failed":
+      case "checkout.session.expired": {
+        const session = event.data.object;
+        const { orderId } = session.metadata || {};
+
+        if (orderId) {
+          await Order.findByIdAndDelete(orderId);
+        }
+
+        break;
+      }
+
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object;
 
@@ -229,7 +269,10 @@ export const stripeWebhooks = async (req, res) => {
           break;
         }
 
-        await Order.findByIdAndUpdate(orderId, { isPaid: true });
+        await Order.findByIdAndUpdate(orderId, {
+          isPaid: true,
+          stripePaymentIntentId: paymentIntent.id,
+        });
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
         break;
@@ -254,6 +297,70 @@ export const stripeWebhooks = async (req, res) => {
   } catch (err) {
     console.error("Webhook handler error:", err);
     res.status(500).send("Webhook handler failed");
+  }
+};
+
+// Verify Stripe checkout session after redirect (fallback when webhooks are not available)
+// GET /api/order/stripe/verify?session_id=...
+export const verifyStripeSession = async (req, res) => {
+  try {
+    const sessionId = String(req.query.session_id || "").trim();
+    const requestingUserId = req.userId;
+
+    if (!sessionId) {
+      throw createClientError("Missing session_id");
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("Stripe key missing");
+    }
+
+    const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
+    const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
+
+    if (!session) {
+      throw createClientError("Session not found");
+    }
+
+    const { orderId, userId } = session.metadata || {};
+
+    if (!orderId || !userId) {
+      const orderBySession = await Order.findOne({ stripeSessionId: sessionId });
+      if (!orderBySession) {
+        throw createClientError("Order metadata missing");
+      }
+
+      if (String(orderBySession.userId) !== String(requestingUserId)) {
+        return res.status(403).json({ success: false, message: "Not allowed" });
+      }
+
+      if (session.payment_status === "paid") {
+        await Order.findByIdAndUpdate(orderBySession._id, {
+          isPaid: true,
+          stripePaymentIntentId: session.payment_intent || null,
+        });
+        await User.findByIdAndUpdate(requestingUserId, { cartItems: {} });
+      }
+
+      return res.json({ success: true, paid: session.payment_status === "paid" });
+    }
+
+    if (String(userId) !== String(requestingUserId)) {
+      return res.status(403).json({ success: false, message: "Not allowed" });
+    }
+
+    if (session.payment_status === "paid") {
+      await Order.findByIdAndUpdate(orderId, {
+        isPaid: true,
+        stripeSessionId: session.id,
+        stripePaymentIntentId: session.payment_intent || null,
+      });
+      await User.findByIdAndUpdate(userId, { cartItems: {} });
+    }
+
+    return res.json({ success: true, paid: session.payment_status === "paid" });
+  } catch (error) {
+    return sendOrderError(res, error);
   }
 };
 // Get orders by User ID : /api/order/user

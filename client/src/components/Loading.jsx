@@ -4,20 +4,50 @@ import { useLocation } from 'react-router-dom'
 
 const Loading = () => {
 
-    const { navigate } = useAppContext()
+    const { navigate, axios, user, authLoading } = useAppContext()
     let { search } = useLocation()
     const query = new URLSearchParams(search)
     const nextURL = query.get('next')
+    const sessionId = query.get('session_id')
     const allowedNextURLs = new Set(["my-orders", "cart", "products"])
     const safeNextURL = allowedNextURLs.has(nextURL) ? nextURL : "my-orders"
 
     useEffect(() => {
-        const timer = setTimeout(()=>{
-            navigate(`/${safeNextURL}`)
-        },5000)
+        let mounted = true
+        let timer
 
-        return () => clearTimeout(timer)
-    }, [navigate, safeNextURL])
+        const scheduleNavigate = (delay) => {
+            timer = setTimeout(() => {
+                if (mounted) navigate(`/${safeNextURL}`)
+            }, delay)
+        }
+
+        const run = async () => {
+            try {
+                if (safeNextURL === "my-orders" && sessionId) {
+                    if (authLoading) {
+                        scheduleNavigate(5000)
+                        return
+                    }
+
+                    if (user) {
+                    await axios.get("/api/order/stripe/verify", { params: { session_id: sessionId } })
+                    }
+                }
+            } catch {
+                // ignore verification errors; user can still see orders once webhook/verification succeeds
+            } finally {
+                const delay = safeNextURL === "my-orders" && sessionId ? 800 : 5000
+                scheduleNavigate(delay)
+            }
+        }
+
+        run()
+        return () => {
+            mounted = false
+            if (timer) clearTimeout(timer)
+        }
+    }, [axios, authLoading, navigate, safeNextURL, sessionId, user])
     
 
     return (

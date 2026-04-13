@@ -18,6 +18,8 @@ const orderSchema = new mongoose.Schema(
     status: { type: String, default: "Order placed" },
     paymentType: { type: String, required: true },
     isPaid: { type: Boolean, required: true, default: false },
+    stripeSessionId: { type: String, default: null },
+    stripePaymentIntentId: { type: String, default: null },
   },
   { timestamps: true },
 );
