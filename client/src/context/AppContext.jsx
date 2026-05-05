@@ -31,6 +31,35 @@ const getBackendURL = () => {
 
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = getBackendURL();
+axios.defaults.timeout = 15000;
+
+const formatAxiosError = (error) => {
+    const status = error?.response?.status;
+    const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Request failed";
+
+    if (!status) {
+        const baseURL = axios.defaults.baseURL || "";
+        return `Network error. Check API URL/CORS: ${baseURL}`;
+    }
+
+    return `${message} (HTTP ${status})`;
+};
+
+// Avoid stacking interceptors during HMR/dev reloads.
+if (!globalThis.__GREEN_CART_AXIOS_CONFIGURED__) {
+    globalThis.__GREEN_CART_AXIOS_CONFIGURED__ = true;
+    axios.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            // Keep callers working; just improve visibility.
+            console.error("API error:", formatAxiosError(error), error);
+            return Promise.reject(error);
+        }
+    );
+}
 
 export const AppContext = createContext()
 
@@ -58,7 +87,8 @@ export const AppContextProvider = ({ children }) => {
                 setIsSeller(false)
             }
 
-        } catch {
+        } catch (error) {
+            console.error(formatAxiosError(error))
             setIsSeller(false)
         }
     }
@@ -71,7 +101,8 @@ export const AppContextProvider = ({ children }) => {
                 setUser(data.user)
                 setCartItems(data.user.cartItems || {})
             }
-        } catch {
+        } catch (error) {
+            console.error(formatAxiosError(error))
             setUser(null)
         } finally {
             setAuthLoading(false)
@@ -91,7 +122,7 @@ export const AppContextProvider = ({ children }) => {
             }
 
         } catch (error) {
-            toast.error(error.message)
+            toast.error(formatAxiosError(error))
         }
     }
 
@@ -167,7 +198,7 @@ export const AppContextProvider = ({ children }) => {
                     setCartItems(data.cartItems || {})
                 }
             } catch (error) {
-                toast.error(error.message)
+                toast.error(formatAxiosError(error))
             }
         }
 

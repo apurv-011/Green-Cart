@@ -13,6 +13,8 @@ import orderRouter from "./routes/orderRoute.js";
 import { stripeWebhooks } from "./controllers/orderController.js";
 
 const app = express();
+// Vercel runs behind a proxy; trust it so secure/cookie/cors behaviors are consistent.
+app.set("trust proxy", 1);
 const port = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV !== "production" && !process.env.VERCEL;
 
@@ -84,7 +86,7 @@ app.post("/stripe", express.raw({ type: "application/json" }), stripeWebhooks);
 // Middleware to parse JSON bodies
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
     if (process.env.CORS_ALLOW_ALL === "true") {
       return callback(null, true);
@@ -111,6 +113,11 @@ app.use(cors({
       if (allowedHostnames.has(hostname)) {
         return callback(null, true);
       }
+
+      // Optional escape hatch for Vercel preview URLs (use with caution).
+      if (process.env.ALLOW_VERCEL_PREVIEWS === "true" && hostname.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
     } catch {
       // ignore
     }
@@ -118,7 +125,10 @@ app.use(cors({
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
-}));
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
