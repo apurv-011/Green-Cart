@@ -18,6 +18,12 @@ const getBackendURL = () => {
         const localHosts = ["localhost", "127.0.0.1"]
         const frontendHost = window.location.hostname
 
+        // If someone accidentally deployed with VITE_BACKEND_URL=localhost, fall back to same-host :3000
+        // so the app at least points to the co-located backend domain pattern.
+        if (localHosts.includes(url.hostname) && !localHosts.includes(frontendHost)) {
+            return `${window.location.protocol}//${frontendHost}:3000`
+        }
+
         if (localHosts.includes(url.hostname) && localHosts.includes(frontendHost) && url.hostname !== frontendHost) {
             url.hostname = frontendHost
             return url.toString().replace(/\/$/, "")

@@ -72,15 +72,6 @@ const buildAllowedOrigins = () => {
 
 const { origins: allowedOrigins, hostnames: allowedHostnames } = buildAllowedOrigins();
 
-app.use(async (req, res, next) => {
-  try {
-    await ensureInitialized();
-    return next();
-  } catch (err) {
-    return next(err);
-  }
-});
-
 app.post("/stripe", express.raw({ type: "application/json" }), stripeWebhooks);
 
 // Middleware to parse JSON bodies
@@ -135,6 +126,23 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
+// Lightweight health endpoint that does not require DB/Cloudinary.
+app.get("/health", (req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+// Initialize heavy deps lazily. Skip preflight requests so CORS works even if DB is down.
+app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS" || req.path === "/health") return next();
+
+  try {
+    await ensureInitialized();
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+});
+
 app.use("/api/user", userRouter);
 app.use("/api/seller", sellerRouter);
 app.use("/api/product", productRouter)
@@ -161,16 +169,9 @@ app.use((err, req, res, next) => {
 });
 
 if (!process.env.VERCEL) {
-  ensureInitialized()
-    .then(() => {
-      app.listen(port, () => {
-        console.log(`Server is running on http://localhost:${port}`);
-      });
-    })
-    .catch((err) => {
-      console.error("Failed to start server:", err?.message || err);
-      process.exitCode = 1;
-    });
+  app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+  });
 }
 
 export default app;
