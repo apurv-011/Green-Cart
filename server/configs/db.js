@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import dns from "dns";
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const globalCache = globalThis.__GREEN_CART_MONGOOSE__ || {
   conn: null,

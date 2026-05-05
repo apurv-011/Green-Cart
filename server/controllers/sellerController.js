@@ -7,6 +7,10 @@ export const sellerLogin = async (req, res) => {
     const { email: rawEmail, password } = req.body;
     const email = String(rawEmail || "").trim().toLowerCase();
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ success: false, message: "JWT is not configured" });
+    }
+
     if (!process.env.SELLER_EMAIL || !process.env.SELLER_PASSWORD) {
       return res.status(500).json({ success: false, message: "Seller credentials are not configured" });
     }

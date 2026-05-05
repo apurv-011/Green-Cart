@@ -11,7 +11,7 @@ import authSeller from "../middlewares/authSeller.js";
 const productRouter = express.Router();
 
 const uploadProductImages = (req, res, next) => {
-  upload.array(["images"])(req, res, (error) => {
+  upload.array("images", 4)(req, res, (error) => {
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
     }

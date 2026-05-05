@@ -204,6 +204,10 @@ export const placeOrderStripe = async (req, res) => {
 
 // Stripe Webhooks to Verify Payments : /stripe
 export const stripeWebhooks = async (req, res) => {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(500).send("Stripe is not configured");
+  }
+
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers["stripe-signature"];
 

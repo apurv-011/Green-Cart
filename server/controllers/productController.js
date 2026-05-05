@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from "cloudinary";
-import fs from "fs/promises";
 import mongoose from "mongoose";
 import Product from "../models/Products.js";
 
@@ -17,13 +16,23 @@ const sendProductError = (res, error) => {
   });
 };
 
-const cleanupUploadedFiles = async (files = []) => {
-  await Promise.all(
-    files
-      .filter((file) => file.path)
-      .map((file) => fs.unlink(file.path).catch(() => {}))
-  );
-};
+const uploadBufferToCloudinary = (file) =>
+  new Promise((resolve, reject) => {
+    if (!file?.buffer) {
+      reject(new Error("Missing image data"));
+      return;
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { resource_type: "image" },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result?.secure_url);
+      }
+    );
+
+    uploadStream.end(file.buffer);
+  });
 
 const parseProductData = (rawProductData) => {
   try {
@@ -72,14 +81,7 @@ export const addProducts = async (req, res) => {
       throw createProductError("At least one product image is required");
     }
 
-    let imagesUrl = await Promise.all(
-      images.map(async (item) => {
-        let result = await cloudinary.uploader.upload(item.path, {
-          resource_type: "image",
-        });
-        return result.secure_url;
-      }),
-    );
+    const imagesUrl = await Promise.all(images.map(uploadBufferToCloudinary));
 
     await Product.create({ ...productData, image: imagesUrl });
 
@@ -87,8 +89,6 @@ export const addProducts = async (req, res) => {
   } catch (error) {
     console.log(error.message);
     return sendProductError(res, error);
-  } finally {
-    await cleanupUploadedFiles(images);
   }
 };
 

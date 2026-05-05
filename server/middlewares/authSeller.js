@@ -9,10 +9,13 @@ const authSeller = async (req, res, next) => {
   try {
     const decodedToken = jwt.verify(sellerToken, process.env.JWT_SECRET);
 
-    if (decodedToken.email === process.env.SELLER_EMAIL) {
-        next();
+    const tokenEmail = String(decodedToken?.email || "").trim().toLowerCase();
+    const sellerEmail = String(process.env.SELLER_EMAIL || "").trim().toLowerCase();
+
+    if (tokenEmail && sellerEmail && tokenEmail === sellerEmail) {
+      next();
     } else {
-        return res.status(401).json({success:false, message: "Not authorized"})
+      return res.status(401).json({ success: false, message: "Not authorized" });
     }
     
   } catch (error) {

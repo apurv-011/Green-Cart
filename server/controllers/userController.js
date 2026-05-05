@@ -18,6 +18,10 @@ export const register = async (req, res) => {
         .json({ message: "Missing required fields", success: false });
     }
 
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ success: false, message: "JWT is not configured" });
+    }
+
     if (password.length < 6) {
       return res
         .status(400)
@@ -66,6 +70,10 @@ export const login = async (req, res) => {
         success: false,
         message: "Email and password are required",
       });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ success: false, message: "JWT is not configured" });
     }
 
     // Check user exists
