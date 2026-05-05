@@ -14,6 +14,7 @@ import { stripeWebhooks } from "./controllers/orderController.js";
 
 const app = express();
 const port = process.env.PORT || 3000;
+const isDev = process.env.NODE_ENV !== "production" && !process.env.VERCEL;
 
 let initPromise = null;
 const ensureInitialized = async () => {
@@ -29,13 +30,45 @@ const ensureInitialized = async () => {
   return initPromise;
 };
 
-// Allow multiple origins for CORS
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  process.env.FRONTEND_URL,
-  ...(process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(",") : []),
-].filter(Boolean).map((origin) => origin.trim().replace(/\/$/, ""));
+const normalizeOrigin = (value) => {
+  if (!value) return null;
+  const trimmed = String(value).trim().replace(/\/$/, "");
+  if (!trimmed) return null;
+  try {
+    // If config is missing protocol (e.g. "myapp.vercel.app"), assume https.
+    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    return new URL(withProto).origin;
+  } catch {
+    return null;
+  }
+};
+
+const buildAllowedOrigins = () => {
+  const raw = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL,
+    ...(process.env.FRONTEND_URLS ? process.env.FRONTEND_URLS.split(",") : []),
+  ];
+
+  // Vercel provides domain without protocol in VERCEL_URL.
+  if (process.env.VERCEL_URL) raw.push(`https://${process.env.VERCEL_URL}`);
+
+  const origins = new Set(raw.map(normalizeOrigin).filter(Boolean));
+
+  const hostnames = new Set();
+  for (const origin of origins) {
+    try {
+      hostnames.add(new URL(origin).hostname);
+    } catch {
+      // ignore
+    }
+  }
+
+  return { origins, hostnames };
+};
+
+const { origins: allowedOrigins, hostnames: allowedHostnames } = buildAllowedOrigins();
 
 app.use(async (req, res, next) => {
   try {
@@ -53,10 +86,33 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
   origin: (origin, callback) => {
-    const normalizedOrigin = origin?.replace(/\/$/, "");
-
-    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+    if (process.env.CORS_ALLOW_ALL === "true") {
       return callback(null, true);
+    }
+
+    // Some clients (mobile apps, curl, server-to-server) won't send an Origin header.
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) return callback(new Error("Not allowed by CORS"));
+
+    if (allowedOrigins.has(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    // In dev, allow any port for localhost to reduce friction.
+    try {
+      const { hostname } = new URL(normalizedOrigin);
+      if (isDev && (hostname === "localhost" || hostname === "127.0.0.1")) {
+        return callback(null, true);
+      }
+
+      // For deployments, allow exact hostname matches (useful for Vercel preview URLs).
+      if (allowedHostnames.has(hostname)) {
+        return callback(null, true);
+      }
+    } catch {
+      // ignore
     }
 
     return callback(new Error("Not allowed by CORS"));
