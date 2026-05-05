@@ -118,7 +118,12 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 204,
 };
-app.use(cors(corsOptions));
+
+app.use(cors({
+  origin: "https://green-cart-client-black.vercel.app",
+  credentials: true
+}));
+
 // Express 5 (path-to-regexp v6) does not accept "*" as a path pattern.
 app.options(/.*/, cors(corsOptions));
 
