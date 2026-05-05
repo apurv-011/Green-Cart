@@ -1,6 +1,6 @@
 # Green-Cart (Final Year Project)
 
-Full‑stack e‑commerce app with user + seller panels, cart, address management, orders (COD + Stripe), and Cloudinary product images.
+Full-stack e-commerce app with user + seller panels, cart, address management, orders (COD + Stripe), and Cloudinary product images.
 
 ## Tech
 - Client: React + Vite + Tailwind
@@ -38,7 +38,7 @@ npm run dev
 If PowerShell blocks `npm`, use `npm.cmd` instead (e.g. `npm.cmd run dev`).
 Open `http://localhost:5173`.
 
-## Stripe (Orders showing in “My Orders”)
+## Stripe (Orders showing in "My Orders")
 This project supports **both**:
 
 1) **Webhooks (recommended)**  

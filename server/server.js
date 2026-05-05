@@ -79,6 +79,14 @@ app.use((err, req, res, next) => {
   // Avoid crashing serverless functions; always return a response.
   console.error(err?.stack || err);
   if (res.headersSent) return next(err);
+
+  if (err?.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      success: false,
+      message: "Origin not allowed",
+    });
+  }
+
   return res.status(500).json({
     success: false,
     message: err?.message || "Internal Server Error",
