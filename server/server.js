@@ -128,7 +128,8 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Express 5 (path-to-regexp v6) does not accept "*" as a path pattern.
+app.options(/.*/, cors(corsOptions));
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
